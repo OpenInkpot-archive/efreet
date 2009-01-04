@@ -4,13 +4,7 @@ include /usr/share/cdbs/1/rules/debhelper.mk
 include /usr/share/cdbs/1/class/autotools.mk
 include /usr/share/cdbs/1/rules/simple-patchsys.mk
 
-DEB_CONFIGURE_EXTRA_FLAGS := --disable-rpath
-
-build/libefreet-doc::
-	cd $(DEB_SRCDIR) && ./gendoc
-
-install/libefreet-doc::
-	cp -R $(DEB_SRCDIR)/doc/html debian/libefreet-doc/usr/share/doc/libefreet-doc/
+DEB_CONFIGURE_EXTRA_FLAGS := --disable-rpath --host=$(DEB_HOST_GNU_TYPE)
 
 clean::
 	rm -rf $(DEB_SRCDIR)/doc/html $(DEB_SRCDIR)/doc/latex
