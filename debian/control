@@ -5,10 +5,11 @@ Maintainer: Alexander Kerner <lunohod@openinkpot.org>
 Build-Depends: debhelper (>= 6), cdbs, libecore-dev
 Standards-Version: 3.7.3
 Homepage: http://www.enlightenment.org
-XCS-Cross-Host-Build-Depends: debhelper (>= 5), cdbs
+XCS-Cross-Host-Build-Depends: debhelper (>= 5), cdbs, cdbs-embedded, automake, libtool, pkg-config
 XCS-Cross-Build-Depends: libecore-dev
 XS-Vcs-Git: http://git.openinkpot.org/efreet.git
 XS-Vcs-Browser: http://git.openinkpot.org/efreet.git
+Format: 3.0 (native)
 
 Package: libefreet0
 Architecture: any

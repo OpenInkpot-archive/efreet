@@ -1,3 +1,11 @@
+efreet (0.5.0-20090103-2) asimov; urgency=low
+
+  * fixed build dependencies
+  * removed shlibs.local
+  * unstable -> asimov
+
+ -- Alexander Kerner <lunohod@openinkpot.org>  Sun, 15 Mar 2009 17:59:16 +0100
+
 efreet (0.5.0-20090103-1) unstable; urgency=low
 
   * OI build
