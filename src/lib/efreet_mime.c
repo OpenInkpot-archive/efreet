@@ -1126,7 +1126,7 @@ efreet_mime_magic_check_priority(const char *file,
             }
         }
 
-        if (last_mime)
+        if (match)
         {
             fclose(f);
             return last_mime;
