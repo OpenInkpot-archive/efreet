@@ -1,3 +1,11 @@
+efreet (0.5.0-20090103-3) asimov; urgency=low
+
+  [ Mikhail Gusarov ]
+  * Fix matching last sequence of magics for given mime-type
+  * Fix broken magic subrule matching
+
+ -- Alexander Kerner <lunohod@openinkpot.org>  Mon, 29 Jun 2009 13:43:19 +0200
+
 efreet (0.5.0-20090103-2+b1) asimov; urgency=low
 
   * Rebuild with new toolchain.
