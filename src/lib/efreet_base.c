@@ -1,16 +1,30 @@
 /* vim: set sw=4 ts=4 sts=4 et: */
+
+#ifdef HAVE_CONFIG_H
+# include <config.h>
+#endif
+
+#include <stdio.h>
+#include <string.h>
+
 #include "Efreet.h"
 #include "efreet_private.h"
+
+#ifdef _WIN32
+# define EFREET_PATH_SEP ';'
+#else
+# define EFREET_PATH_SEP ':'
+#endif
 
 static const char *efreet_home_dir = NULL;
 static const char *xdg_data_home = NULL;
 static const char *xdg_config_home = NULL;
 static const char *xdg_cache_home = NULL;
-static Ecore_List *xdg_data_dirs = NULL;
-static Ecore_List *xdg_config_dirs = NULL;
+static Eina_List  *xdg_data_dirs = NULL;
+static Eina_List  *xdg_config_dirs = NULL;
 
 static const char *efreet_dir_get(const char *key, const char *fallback);
-static Ecore_List *efreet_dirs_get(const char *key,
+static Eina_List  *efreet_dirs_get(const char *key,
                                         const char *fallback);
 
 /**
@@ -22,6 +36,11 @@ int
 efreet_base_init(void)
 {
     if (!eina_stringshare_init()) return 0;
+    if (!eina_list_init())
+    {
+        eina_stringshare_shutdown();
+        return 0;
+    }
 
     return 1;
 }
@@ -39,9 +58,10 @@ efreet_base_shutdown(void)
     IF_RELEASE(xdg_config_home);
     IF_RELEASE(xdg_cache_home);
 
-    IF_FREE_LIST(xdg_data_dirs);
-    IF_FREE_LIST(xdg_config_dirs);
+    IF_FREE_LIST(xdg_data_dirs, eina_stringshare_del);
+    IF_FREE_LIST(xdg_config_dirs, eina_stringshare_del);
 
+    eina_list_shutdown();
     eina_stringshare_shutdown();
 }
 
@@ -56,6 +76,10 @@ efreet_home_dir_get(void)
     if (efreet_home_dir) return efreet_home_dir;
 
     efreet_home_dir = getenv("HOME");
+#ifdef _WIN32
+    if (!efreet_home_dir || efreet_home_dir[0] == '\0')
+        efreet_home_dir = getenv("USERPROFILE");
+#endif
     if (!efreet_home_dir || efreet_home_dir[0] == '\0')
         efreet_home_dir = "/tmp";
 
@@ -77,20 +101,30 @@ efreet_data_home_get(void)
 }
 
 /**
- * @return Returns the Ecore_List of preference ordered extra data directories
- * @brief Returns the Ecore_List of prefernece oredred extra data
+ * @return Returns the Eina_List of preference ordered extra data directories
+ * @brief Returns the Eina_List of prefernece oredred extra data
  * directories
  *
  * @note The returned list is static inside Efreet. If you add/remove from the
  * list then the next call to efreet_data_dirs_get() will return your
  * modified values. DO NOT free this list.
  */
-EAPI Ecore_List *
+EAPI Eina_List *
 efreet_data_dirs_get(void)
 {
+#ifdef _WIN32
+    char buf[4096];
+#endif
+
     if (xdg_data_dirs) return xdg_data_dirs;
+
+#ifdef _WIN32
+    snprintf(buf, 4096, "%s\\Efl;" PACKAGE_DATA_DIR ";/usr/share", getenv("APPDATA"));
+    xdg_data_dirs = efreet_dirs_get("XDG_DATA_DIRS", buf);
+#else
     xdg_data_dirs = efreet_dirs_get("XDG_DATA_DIRS",
-                            "/usr/local/share:/usr/share");
+                            PACKAGE_DATA_DIR ":/usr/share");
+#endif
     return xdg_data_dirs;
 }
 
@@ -107,15 +141,15 @@ efreet_config_home_get(void)
 }
 
 /**
- * @return Returns the Ecore_List of preference ordered extra config directories
- * @brief Returns the Ecore_List of prefernece oredred extra config
+ * @return Returns the Eina_List of preference ordered extra config directories
+ * @brief Returns the Eina_List of prefernece ordered extra config
  * directories
  *
  * @note The returned list is static inside Efreet. If you add/remove from the
  * list then the next call to efreet_config_dirs_get() will return your
  * modified values. DO NOT free this list.
  */
-EAPI Ecore_List *
+EAPI Eina_List *
 efreet_config_dirs_get(void)
 {
     if (xdg_config_dirs) return xdg_config_dirs;
@@ -177,34 +211,32 @@ efreet_dir_get(const char *key, const char *fallback)
  * @brief Creates a list of directories as given in the environment key @a
  * key or from the fallbacks in @a fallback
  */
-static Ecore_List *
+static Eina_List *
 efreet_dirs_get(const char *key, const char *fallback)
 {
-    Ecore_List *dirs;
+    Eina_List *dirs = NULL;
     const char *path;
     char *tmp, *s, *p;
 
     path = getenv(key);
     if (!path || (path[0] == '\0')) path = fallback;
 
-    dirs = ecore_list_new();
-    ecore_list_free_cb_set(dirs, ECORE_FREE_CB(eina_stringshare_del));
     if (!path) return dirs;
 
     tmp = strdup(path);
     s = tmp;
-    p = strchr(s, ':');
+    p = strchr(s, EFREET_PATH_SEP);
     while (p)
     {
         *p = '\0';
-        if (!ecore_list_find(dirs, ECORE_COMPARE_CB(strcmp), s))
-            ecore_list_append(dirs, (void *)eina_stringshare_add(s));
+        if (!eina_list_search_unsorted(dirs, EINA_COMPARE_CB(strcmp), s))
+            dirs = eina_list_append(dirs, (void *)eina_stringshare_add(s));
 
         s = ++p;
-        p = strchr(s, ':');
+        p = strchr(s, EFREET_PATH_SEP);
     }
-    if (!ecore_list_find(dirs, ECORE_COMPARE_CB(strcmp), s))
-      ecore_list_append(dirs, (void *)eina_stringshare_add(s));
+    if (!eina_list_search_unsorted(dirs, EINA_COMPARE_CB(strcmp), s))
+      dirs = eina_list_append(dirs, (void *)eina_stringshare_add(s));
     FREE(tmp);
 
     return dirs;

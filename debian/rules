@@ -1,11 +1,15 @@
 #!/usr/bin/make -f
-  
+
 include /usr/share/cdbs/1/rules/debhelper.mk
 include /usr/share/cdbs/1/class/autotools.mk
 include /usr/share/cdbs/1/rules/simple-patchsys.mk
 
 DEB_CONFIGURE_EXTRA_FLAGS := --disable-rpath --host=$(DEB_HOST_GNU_TYPE)
+DEB_CONFIGURE_SCRIPT := ./autogen.sh
+DEB_MAKE_CLEAN_TARGET := distclean
+CFLAGS += -fvisibility=hidden
+LDFLAGS += -fvisibility=hidden
 
 clean::
-	rm -rf $(DEB_SRCDIR)/doc/html $(DEB_SRCDIR)/doc/latex
-	./autogen.sh --prefix=/usr $(DEB_CONFIGURE_EXTRA_FLAGS)
+	[ ! -f Makefile ] || make distclean
+	rm -f efreet-*.tar.bz2 efreet-*.cdbs-config_list

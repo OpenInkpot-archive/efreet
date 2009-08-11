@@ -1,11 +1,13 @@
 #include "Efreet.h"
 #include <stdio.h>
+#include <Ecore.h>
 #include "ef_test.h"
 
 static int
 timer(void *data __UNUSED__)
 {
-    Ecore_List *list;
+    Eina_List *list;
+    Eina_List *l;
     Efreet_Desktop *desktop;
     double start;
 
@@ -22,12 +24,12 @@ timer(void *data __UNUSED__)
     list = efreet_util_desktop_mime_list("application/ogg");
     if (list)
     {
-        ecore_list_first_goto(list);
-        while ((desktop = ecore_list_next(list)))
+	EINA_LIST_FOREACH(list, l, desktop)
         {
             printf("application/ogg: %s\n", desktop->name);
         }
-        ecore_list_destroy(list);
+        while (list)
+		list = eina_list_remove_list(list, list);
     }
 
     return 0;

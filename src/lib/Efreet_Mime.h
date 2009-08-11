@@ -13,16 +13,20 @@
  * @{
  */
 
-
 #ifdef EAPI
-#undef EAPI
+# undef EAPI
 #endif
-#ifdef _MSC_VER
-# ifdef BUILDING_DLL
-#  define EAPI __declspec(dllexport)
+
+#ifdef _WIN32
+# ifdef EFL_EFREET_MIME_BUILD
+#  ifdef DLL_EXPORT
+#   define EAPI __declspec(dllexport)
+#  else
+#   define EAPI
+#  endif /* ! DLL_EXPORT */
 # else
 #  define EAPI __declspec(dllimport)
-# endif
+# endif /* ! EFL_EFREET_MIME_BUILD */
 #else
 # ifdef __GNUC__
 #  if __GNUC__ >= 4
@@ -51,6 +55,9 @@ EAPI const char *efreet_mime_fallback_type_get(const char *file);
 
 EAPI char *efreet_mime_type_icon_get(const char *mime, const char *theme,
                                                           unsigned int size);
+
+EAPI void efreet_mime_type_cache_clear(void);
+EAPI void efreet_mime_type_cache_flush(void);
 
 /**
  * @}

@@ -1,4 +1,34 @@
 /* vim: set sw=4 ts=4 sts=4 et: */
+
+#ifdef HAVE_CONFIG_H
+# include <config.h>
+#endif
+
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/mman.h>
+
+#ifdef HAVE_ALLOCA_H
+# include <alloca.h>
+#elif defined __GNUC__
+# define alloca __builtin_alloca
+#elif defined _AIX
+# define alloca __alloca
+#elif defined _MSC_VER
+# include <malloc.h>
+# define alloca _alloca
+#else
+# include <stddef.h>
+# ifdef  __cplusplus
+extern "C"
+# endif
+void *alloca (size_t);
+#endif
+
 #include "Efreet.h"
 #include "efreet_private.h"
 
@@ -80,6 +110,8 @@ efreet_ini_parse(const char *file)
     struct stat file_stat;
     int line_length, left;
 
+    if (!file) return NULL;
+
     f = fopen(file, "rb");
     if (!f) return NULL;
 
@@ -141,7 +173,6 @@ efreet_ini_parse(const char *file)
 
             if (line_start[header_length] == ']')
             {
-                Eina_Hash *old;
                 const char *header;
 
                 header = alloca(header_length * sizeof(unsigned char));
@@ -180,7 +211,6 @@ efreet_ini_parse(const char *file)
         if (sep < line_length)
         {
             const char *key, *value;
-            char *old;
             int key_end, value_start, value_end;
 
             /* trim whitespace from end of key */
@@ -625,7 +655,7 @@ efreet_ini_unescape(const char *str)
 }
 
 static Eina_Bool
-efreet_ini_section_save(const Eina_Hash *hash, const void *key, void *value, void *fdata)
+efreet_ini_section_save(const Eina_Hash *hash __UNUSED__, const void *key, void *value, void *fdata)
 {
     FILE *f = fdata;
 
@@ -635,7 +665,7 @@ efreet_ini_section_save(const Eina_Hash *hash, const void *key, void *value, voi
 }
 
 static Eina_Bool
-efreet_ini_value_save(const Eina_Hash *hash, const void *key, void *value, void *fdata)
+efreet_ini_value_save(const Eina_Hash *hash __UNUSED__, const void *key, void *value, void *fdata)
 {
     FILE *f = fdata;
 

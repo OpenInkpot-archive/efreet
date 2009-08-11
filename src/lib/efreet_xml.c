@@ -1,6 +1,23 @@
 /* vim: set sw=4 ts=4 sts=4 et: */
+
+#ifdef HAVE_CONFIG_H
+# include <config.h>
+#endif
+
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
+
+#include <Ecore_File.h>
+
 #include "Efreet.h"
 #include "efreet_private.h"
+#include "efreet_xml.h"
 
 #if 0
 static void efreet_xml_dump(Efreet_Xml *xml, int level);
@@ -64,23 +81,23 @@ efreet_xml_new(const char *file)
     if (!file) return NULL;
 
     size = ecore_file_size(file);
-    if (size <= 0) goto ERROR;
+    if (size <= 0) goto efreet_error;
 
     fd = open(file, O_RDONLY);
-    if (fd == -1) goto ERROR;
+    if (fd == -1) goto efreet_error;
 
     data = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
-    if (data == (void *)-1) goto ERROR;
+    if (data == (void *)-1) goto efreet_error;
 
     error = 0;
     xml = efreet_xml_parse(&data, &size);
-    if (error) goto ERROR;
+    if (error) goto efreet_error;
 
     munmap(data, size);
     close(fd);
     return xml;
 
-ERROR:
+efreet_error:
     fprintf(stderr, "[efreet]: could not parse xml file\n");
     if (data != (void *)-1) munmap(data, size);
     if (fd != -1) close(fd);
@@ -97,8 +114,7 @@ ERROR:
 void
 efreet_xml_del(Efreet_Xml *xml)
 {
-    if (xml->children) ecore_dlist_destroy(xml->children);
-    xml->children = NULL;
+    IF_FREE_LIST(xml->children, efreet_xml_cb_attribute_free);
 
     if (xml->tag) eina_stringshare_del(xml->tag);
     if (xml->attributes)
@@ -166,11 +182,11 @@ efreet_xml_dump(Efreet_Xml *xml, int level)
     if (xml->children)
     {
         Efreet_Xml *child;
+        Eina_List *l;
 
         printf(">\n");
 
-        ecore_dlist_first_goto(xml->children);
-        while ((child = ecore_dlist_next(xml->children)))
+        EINA_LIST_FOREACH(xml->children, l, child)
             efreet_xml_dump(child, level + 1);
 
         for (i = 0; i < level; i++)
@@ -200,8 +216,7 @@ efreet_xml_parse(char **data, int *size)
         return NULL;
     }
 
-    xml->children = ecore_dlist_new();
-    ecore_dlist_free_cb_set(xml->children, efreet_xml_cb_attribute_free);
+    xml->children = NULL;
 
     xml->tag = tag;
     efreet_xml_attributes_parse(data, size, &(xml->attributes));
@@ -214,7 +229,7 @@ efreet_xml_parse(char **data, int *size)
     if (efreet_xml_tag_close(data, size, xml->tag)) return xml;
 
     while ((sub_xml = efreet_xml_parse(data, size)))
-        ecore_dlist_append(xml->children, sub_xml);
+        xml->children = eina_list_append(xml->children, sub_xml);
 
     efreet_xml_tag_close(data, size, xml->tag);
 
@@ -337,7 +352,7 @@ efreet_xml_attributes_parse(char **data, int *size,
             if (buf_size <= 1)
             {
                 fprintf(stderr, "[efreet]: zero length key\n");
-                goto ERROR;
+                goto efreet_error;
             }
 
             if (buf_size > 256) buf_size = 256;
@@ -361,7 +376,7 @@ efreet_xml_attributes_parse(char **data, int *size,
             if (!start)
             {
                 fprintf(stderr, "[efreet]: missing value for attribute!\n");
-                goto ERROR;
+                goto efreet_error;
             }
 
             /* search for '"', beginning of value */
@@ -380,7 +395,7 @@ efreet_xml_attributes_parse(char **data, int *size,
             if (!start)
             {
                 fprintf(stderr, "[efreet]: erroneous value for attribute!\n");
-                goto ERROR;
+                goto efreet_error;
             }
 
             /* skip '"' */
@@ -404,14 +419,14 @@ efreet_xml_attributes_parse(char **data, int *size,
             if (!end)
             {
                 fprintf(stderr, "[efreet]: erroneous value for attribute!\n");
-                goto ERROR;
+                goto efreet_error;
             }
 
             buf_size = end - start + 1;
             if (buf_size <= 1)
             {
                 fprintf(stderr, "[efreet]: zero length value\n");
-                goto ERROR;
+                goto efreet_error;
             }
 
             if (buf_size > 256) buf_size = 256;
@@ -435,7 +450,7 @@ efreet_xml_attributes_parse(char **data, int *size,
     }
     return;
 
-ERROR:
+efreet_error:
     while (count >= 0)
     {
         if (attr[count].key) eina_stringshare_del(attr[count].key);

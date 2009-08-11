@@ -11,32 +11,6 @@
  * @{
  */
 
-#include "config.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <ctype.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <dirent.h>
-#include <fnmatch.h>
-#include <limits.h>
-
-#ifdef HAVE_ALLOCA_H
-#include <alloca.h>
-#endif
-
-#include <Eina.h>
-#include <Ecore.h>
-#include <Ecore_File.h>
-#include <Ecore_Str.h>
-
-#include "efreet_xml.h"
-#include "efreet_ini.h"
-
 /**
  * @def NEW(x, c)
  * Allocate and zero out c structures of type x
@@ -70,22 +44,12 @@
  * @def IF_FREE_LIST(x)
  * If x is a valid pointer destroy x and set to NULL
  */
-#define IF_FREE_LIST(x) do { \
-    if (x) { \
-        Ecore_List *__tmp; __tmp = (x); (x) = NULL; ecore_list_destroy(__tmp); \
+#define IF_FREE_LIST(list, free_cb) do { \
+    while (list) \
+    { \
+        free_cb(eina_list_data_get(list)); \
+        list = eina_list_remove_list(list, list); \
     } \
-    (x) = NULL; \
-} while (0)
-
-/**
- * @def IF_FREE_DLIST(x)
- * If x is a valid pointer destroy x and set to NULL
- */
-#define IF_FREE_DLIST(x) do { \
-    if (x) { \
-        Ecore_DList *__tmp; __tmp = (x); (x) = NULL; ecore_dlist_destroy(__tmp); \
-    } \
-    (x) = NULL; \
 } while (0)
 
 /**
@@ -146,7 +110,7 @@ struct Efreet_Desktop_Command
   Efreet_Desktop_Progress_Cb cb_progress;
   void *data;
 
-  Ecore_List *files; /**< list of Efreet_Desktop_Command_File */
+  Eina_List *files; /**< list of Efreet_Desktop_Command_File */
 };
 
 /**
@@ -178,8 +142,8 @@ void efreet_icon_shutdown(void);
 
 int efreet_menu_init(void);
 void efreet_menu_shutdown(void);
-Ecore_List *efreet_default_dirs_get(const char *user_dir,
-                                    Ecore_List *system_dirs,
+Eina_List *efreet_default_dirs_get(const char *user_dir,
+                                    Eina_List *system_dirs,
                                     const char *suffix);
 
 int efreet_ini_init(void);
@@ -197,6 +161,12 @@ EAPI const char *efreet_lang_modifier_get(void);
 size_t efreet_array_cat(char *buffer, size_t size, const char *strs[]);
 
 const char *efreet_desktop_environment_get(void);
+
+#define NON_EXISTING (void *)-1
+
+void efreet_cache_clear(void);
+const char *efreet_icon_hash_get(const char *theme_name, const char *icon, int size);
+void efreet_icon_hash_put(const char *theme_name, const char *icon, int size, const char *file);
 
 /**
  * @}

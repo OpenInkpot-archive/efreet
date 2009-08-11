@@ -39,6 +39,9 @@ ef_cb_efreet_data_home(void)
     efreet_shutdown();
     unsetenv("XDG_DATA_HOME");
     unsetenv("HOME");
+#ifdef _WIN32
+    unsetenv("USERPROFILE");
+#endif
     efreet_init();
 
     tmp = efreet_data_home_get();
@@ -88,6 +91,9 @@ ef_cb_efreet_config_home(void)
     efreet_shutdown();
     unsetenv("XDG_CONFIG_HOME");
     unsetenv("HOME");
+#ifdef _WIN32
+    unsetenv("USERPROFILE");
+#endif
     efreet_init();
 
     tmp = efreet_config_home_get();
@@ -137,6 +143,9 @@ ef_cb_efreet_cache_home(void)
     efreet_shutdown();
     unsetenv("XDG_CACHE_HOME");
     unsetenv("HOME");
+#ifdef _WIN32
+    unsetenv("USERPROFILE");
+#endif
     efreet_init();
 
     tmp = efreet_cache_home_get();
@@ -153,7 +162,7 @@ ef_cb_efreet_cache_home(void)
 int
 ef_cb_efreet_data_dirs(void)
 {
-    Ecore_List *tmp;
+    Eina_List *tmp, *l;
     int ret = 1, i;
     char dirs[128], *val;
     char *vals[] = {"/var/tmp/a", "/tmp/b", "/usr/local/share", "/etc", NULL};
@@ -172,8 +181,7 @@ ef_cb_efreet_data_dirs(void)
 
     i = 0;
     tmp = efreet_data_dirs_get();
-    ecore_list_first_goto(tmp);
-    while ((val = ecore_list_next(tmp)))
+    EINA_LIST_FOREACH(tmp, l, val)
     {
         if (vals[i] == NULL)
         {
@@ -199,14 +207,13 @@ ef_cb_efreet_data_dirs(void)
 
     i = 0;
     tmp = efreet_data_dirs_get();
-    if (ecore_list_count(tmp) != 2)
+    if (eina_list_count(tmp) != 2)
     {
         printf("efreet_data_dirs_get() nodes is differnet from expected default\n");
         ret = 0;
     }
 
-    ecore_list_first_goto(tmp);
-    while ((val = ecore_list_next(tmp)))
+    EINA_LIST_FOREACH(tmp, l, val)
     {
         if (def_vals[i] == NULL)
         {
@@ -231,7 +238,7 @@ ef_cb_efreet_data_dirs(void)
 int
 ef_cb_efreet_config_dirs(void)
 {
-    Ecore_List *tmp;
+    Eina_List *tmp, *l;
     int ret = 1, i;
     char dirs[128], *val;
     char *vals[] = {"/var/tmp/a", "/tmp/b", "/usr/local/share", "/etc", NULL};
@@ -251,8 +258,7 @@ ef_cb_efreet_config_dirs(void)
 
     i = 0;
     tmp = efreet_config_dirs_get();
-    ecore_list_first_goto(tmp);
-    while ((val = ecore_list_next(tmp)))
+    EINA_LIST_FOREACH(tmp, l, val)
     {
         if (vals[i] == NULL)
         {
@@ -278,8 +284,7 @@ ef_cb_efreet_config_dirs(void)
 
     i = 0;
     tmp = efreet_config_dirs_get();
-    ecore_list_first_goto(tmp);
-    while ((val = ecore_list_next(tmp)))
+    EINA_LIST_FOREACH(tmp, l, val)
     {
         if (def_vals[i] == NULL)
         {
