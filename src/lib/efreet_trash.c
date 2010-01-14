@@ -14,7 +14,16 @@
 #include "Efreet_Trash.h"
 #include "efreet_private.h"
 
+static unsigned int _efreet_trash_init_count = 0;
 static const char *efreet_trash_dir = NULL;
+
+/* define macros and variable for using the eina logging system  */
+
+#ifdef EFREET_MODULE_LOG_DOM 
+#undef EFREET_MODULE_LOG_DOM
+#endif
+#define EFREET_MODULE_LOG_DOM _efreet_trash_log_dom
+static int _efreet_trash_log_dom = -1;
 
 /**
  * @return Returns 1 on success or 0 on failure
@@ -23,17 +32,37 @@ static const char *efreet_trash_dir = NULL;
 EAPI int
 efreet_trash_init(void)
 {
-    return 1;
+    if (++_efreet_trash_init_count != 1)
+        return _efreet_trash_init_count;
+
+    if (!eina_init())
+        return --_efreet_trash_init_count;
+
+    _efreet_trash_log_dom = eina_log_domain_register("Efreet_trash", EFREET_DEFAULT_LOG_COLOR);
+    if (_efreet_trash_log_dom < 0)
+    {
+	ERROR("Efreet: Could not create a log domain for Efreet_trash");
+        eina_shutdown();
+        return --_efreet_trash_init_count;
+      }
+    return _efreet_trash_init_count;
 }
 
 /**
  * @return Returns no value
  * @brief Cleans up the efreet trash system
  */
-EAPI void
+EAPI int
 efreet_trash_shutdown(void)
 {
+    if (--_efreet_trash_init_count != 0)
+        return _efreet_trash_init_count;
+
     IF_RELEASE(efreet_trash_dir);
+    eina_log_domain_unregister(_efreet_trash_log_dom);
+    eina_shutdown();
+
+    return _efreet_trash_init_count;
 }
 
 /**
@@ -107,13 +136,13 @@ efreet_trash_delete_uri(Efreet_Uri *uri, int force_delete)
             if (!force_delete) return -1;
             if (!ecore_file_recursive_rm(uri->path))
             {
-                printf("EFREET TRASH ERROR: Can't delete file.\n");
+                ERR("EFREET TRASH ERROR: Can't delete file.");
                 return 0; 
             }
         }
         else
         {
-            printf("EFREET TRASH ERROR: Can't move file to trash.\n");
+            ERR("EFREET TRASH ERROR: Can't move file to trash.");
             return 0;
         }
     }
@@ -140,7 +169,7 @@ efreet_trash_delete_uri(Efreet_Uri *uri, int force_delete)
     }
     else
     {
-        printf("EFREET TRASH ERROR: Can't create trash info file.\n");
+        ERR("EFREET TRASH ERROR: Can't create trash info file.");
         return 0;
     }
 

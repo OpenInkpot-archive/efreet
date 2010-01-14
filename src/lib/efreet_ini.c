@@ -32,18 +32,19 @@ void *alloca (size_t);
 #include "Efreet.h"
 #include "efreet_private.h"
 
+#ifdef EFREET_MODULE_LOG_DOM
+#undef EFREET_MODULE_LOG_DOM
+#endif
+#define EFREET_MODULE_LOG_DOM _efreet_ini_log_dom
+static int _efreet_ini_log_dom = -1;
+
 static Eina_Hash *efreet_ini_parse(const char *file);
 static char *efreet_ini_unescape(const char *str);
-
+static int _efreet_ini_log_om = -1;
 static Eina_Bool
 efreet_ini_section_save(const Eina_Hash *hash, const void *key, void *data, void *fdata);
 static Eina_Bool
 efreet_ini_value_save(const Eina_Hash *hash, const void *key, void *data, void *fdata);
-
-/**
- * The number of times the Ini subsytem has been initialized
- */
-static int init = 0;
 
 /**
  * @internal
@@ -53,9 +54,13 @@ static int init = 0;
 int
 efreet_ini_init(void)
 {
-    if (init++) return init;
-    if (!eina_stringshare_init()) return --init;
-    return init;
+    _efreet_ini_log_dom = eina_log_domain_register("Efreet_init", EFREET_DEFAULT_LOG_COLOR);
+    if (_efreet_ini_log_dom < 0)
+    {
+	ERROR("Efreet: Could not create a log domain for efreet_init");
+	return 0;
+    }
+    return 1;
 }
 
 /**
@@ -63,12 +68,10 @@ efreet_ini_init(void)
  * @returns the number of initializations left for this system
  * @brief Attempts to shut down the subsystem if nothing else is using it
  */
-int
+void
 efreet_ini_shutdown(void)
 {
-    if (--init) return init;
-    eina_stringshare_shutdown();
-    return init;
+    eina_log_domain_unregister(_efreet_ini_log_dom);
 }
 
 /**
@@ -142,8 +145,8 @@ efreet_ini_parse(const char *file)
         int sep;
 
         /* find the end of line */
-        for (line_length = 0; 
-                (line_length < left) && 
+        for (line_length = 0;
+                (line_length < left) &&
                 (line_start[line_length] != '\n'); line_length++)
             ;
 
@@ -155,9 +158,9 @@ efreet_ini_parse(const char *file)
         }
 
         /* skip empty lines and comments */
-        if ((line_length == 0) || (line_start[0] == '\r') || 
+        if ((line_length == 0) || (line_start[0] == '\r') ||
                 (line_start[0] == '\n') || (line_start[0] == '#') ||
-                (line_start[0] == '\0')) 
+                (line_start[0] == '\0'))
             goto next_line;
 
         /* new section */
@@ -166,8 +169,8 @@ efreet_ini_parse(const char *file)
             int header_length;
 
             /* find the ']' */
-            for (header_length = 1; 
-                    (header_length < line_length) && 
+            for (header_length = 1;
+                    (header_length < line_length) &&
                     (line_start[header_length] != ']'); ++header_length)
                 ;
 
@@ -184,8 +187,8 @@ efreet_ini_parse(const char *file)
                 section = eina_hash_string_small_new(free);
 
                 eina_hash_del(data, header, NULL);
-//                if (old) printf("[efreet] Warning: duplicate section '%s' "
-  //                              "in file '%s'\n", header, file);
+//                if (old) INF("[efreet] Warning: duplicate section '%s' "
+  //                              "in file '%s'", header, file);
 
                 eina_hash_add(data, header, section);
             }
@@ -200,7 +203,7 @@ efreet_ini_parse(const char *file)
 
         if (section == NULL)
         {
-//            printf("Invalid file (%s) (missing section)\n", file);
+//            INF("Invalid file (%s) (missing section)", file);
             goto next_line;
         }
 
@@ -214,7 +217,7 @@ efreet_ini_parse(const char *file)
             int key_end, value_start, value_end;
 
             /* trim whitespace from end of key */
-            for (key_end = sep - 1; 
+            for (key_end = sep - 1;
                     (key_end > 0) && isspace(line_start[key_end]); --key_end)
                 ;
 
@@ -227,7 +230,7 @@ efreet_ini_parse(const char *file)
                 ;
 
             /* trim \n off of end of value */
-            for (value_end = line_length; 
+            for (value_end = line_length;
                  (value_end > value_start) &&
                  ((line_start[value_end] == '\n') ||
                   (line_start[value_end] == '\r')); --value_end)
@@ -242,7 +245,7 @@ efreet_ini_parse(const char *file)
             if (key_end == 0)
             {
                 /* invalid file... */
-//                printf("Invalid file (%s) (invalid key=value pair)\n", file);
+//                INF("Invalid file (%s) (invalid key=value pair)", file);
 
                 goto next_line;
             }
@@ -254,7 +257,7 @@ efreet_ini_parse(const char *file)
             memcpy((char*)key, line_start, key_end);
             ((char*)key)[key_end] = '\0';
 
-            memcpy((char*)value, line_start + value_start, 
+            memcpy((char*)value, line_start + value_start,
                     value_end - value_start);
             ((char*)value)[value_end - value_start] = '\0';
 
@@ -264,7 +267,7 @@ efreet_ini_parse(const char *file)
 //        else
 //        {
 //            /* invalid file... */
-//            printf("Invalid file (%s) (missing = from key=value pair)\n", file);
+//            INF("Invalid file (%s) (missing = from key=value pair)", file);
 //        }
 
 next_line:
@@ -598,6 +601,20 @@ efreet_ini_localestring_set(Efreet_Ini *ini, const char *key, const char *value)
 
     efreet_ini_string_set(ini, buf, value);
     FREE(buf);
+}
+
+/**
+ * @param ini: The ini struct to work with
+ * @param key: The key to remove
+ * @return Returns no value
+ * @brief Remove the given key from the ini struct
+ */
+EAPI void
+efreet_ini_key_unset(Efreet_Ini *ini, const char *key)
+{
+    if (!ini || !key || !ini->section) return;
+
+    eina_hash_del(ini->section, key, NULL);
 }
 
 /**

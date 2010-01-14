@@ -26,8 +26,6 @@ static Eina_List *efreet_icon_extensions = NULL;
 static Eina_List *efreet_extra_icon_dirs = NULL;
 static Eina_Hash *efreet_icon_cache = NULL;
 
-static int efreet_icon_init_count = 0;
-
 typedef struct Efreet_Icon_Cache Efreet_Icon_Cache;
 struct Efreet_Icon_Cache
 {
@@ -97,6 +95,13 @@ static void efreet_icon_cache_add(Efreet_Icon_Theme *theme, const char *icon, un
 
 static Efreet_Icon_Theme *fake_null = NULL;
 
+
+#ifdef EFREET_MODULE_LOG_DOM 
+#undef EFREET_MODULE_LOG_DOM
+#endif
+#define EFREET_MODULE_LOG_DOM _efreet_icon_log_dom
+static int _efreet_icon_log_dom = -1; 
+
 static void
 _efreet_icon_cache_list_destroy(Eina_List *list)
 {
@@ -114,9 +119,6 @@ _efreet_icon_cache_list_destroy(Eina_List *list)
 int
 efreet_icon_init(void)
 {
-    if (efreet_icon_init_count++ > 0)
-        return efreet_icon_init_count;
-
     if (!efreet_icon_themes)
     {
         const char *default_exts[] = {".png", ".xpm", NULL};
@@ -124,7 +126,6 @@ efreet_icon_init(void)
 
         if (!ecore_init())
         {
-            efreet_icon_init_count--;
             return 0;
         }
 
@@ -149,11 +150,6 @@ efreet_icon_init(void)
 void
 efreet_icon_shutdown(void)
 {
-    void *d;
-
-    if (--efreet_icon_init_count)
-        return;
-
     IF_FREE(efreet_icon_user_dir);
     IF_FREE(efreet_icon_deprecated_user_dir);
 
@@ -170,7 +166,6 @@ efreet_icon_shutdown(void)
    }
 
     ecore_shutdown();
-    efreet_icon_init_count = 0;
 }
 
 /**
@@ -314,6 +309,8 @@ efreet_icon_remove_extension(const char *icon)
     Eina_List *l;
     char *tmp = NULL, *ext = NULL;
 
+    if (!icon) return NULL;
+
     tmp = strdup(icon);
     ext = strrchr(tmp, '.');
     if (ext)
@@ -324,7 +321,7 @@ efreet_icon_remove_extension(const char *icon)
             if (!strcmp(ext, ext2))
             {
 #ifdef STRICT_SPEC
-                printf("[Efreet]: Requesting an icon with an extension: %s\n",
+                WRN("[Efreet]: Requesting an icon with an extension: %s",
                                                                         icon);
 #endif
                 *ext = '\0';
@@ -859,6 +856,17 @@ efreet_icon_fallback_icon(const char *icon_name)
             }
         }
 
+        EINA_LIST_FOREACH(xdg_dirs, l, dir)
+        {
+            snprintf(path, PATH_MAX, "%s/pixmaps", dir);
+            icon = efreet_icon_fallback_dir_scan(path, icon_name);
+            if (icon)
+            {
+                efreet_icon_cache_add(efreet_icon_find_theme_check(NULL), icon_name, 0, icon);
+                return icon;
+            }
+        }
+
         icon = efreet_icon_fallback_dir_scan("/usr/share/pixmaps", icon_name);
     }
 
@@ -906,7 +914,7 @@ efreet_icon_fallback_dir_scan(const char *dir, const char *icon_name)
             icon = strdup(path);
 #ifdef STRICT_SPEC
             if (icon)
-                printf("[Efreet]: Found an icon that already has an extension: %s\n", path);
+                WRN("[Efreet]: Found an icon that already has an extension: %s", path);
 #endif
         }
     }
@@ -1133,7 +1141,6 @@ efreet_icon_theme_new(void)
 static void
 efreet_icon_theme_free(Efreet_Icon_Theme *theme)
 {
-    void *d;
     if (!theme) return;
 
     IF_RELEASE(theme->name.internal);
@@ -1246,6 +1253,12 @@ efreet_icon_theme_dir_scan_all(const char *theme_name)
     EINA_LIST_FOREACH(xdg_dirs, l, dir)
     {
         snprintf(path, sizeof(path), "%s/icons", dir);
+        efreet_icon_theme_dir_scan(path, theme_name);
+    }
+
+    EINA_LIST_FOREACH(xdg_dirs, l, dir)
+    {
+        snprintf(path, sizeof(path), "%s/pixmaps", dir);
         efreet_icon_theme_dir_scan(path, theme_name);
     }
 

@@ -23,6 +23,15 @@ static const char *xdg_cache_home = NULL;
 static Eina_List  *xdg_data_dirs = NULL;
 static Eina_List  *xdg_config_dirs = NULL;
 
+/* define macros and variable for using the eina logging system  */
+#ifdef EFREET_MODULE_LOG_DOM 
+#undef EFREET_MODULE_LOG_DOM
+#endif
+
+#define EFREET_MODULE_LOG_DOM _efreet_base_log_dom
+static int _efreet_base_log_dom = -1;
+
+
 static const char *efreet_dir_get(const char *key, const char *fallback);
 static Eina_List  *efreet_dirs_get(const char *key,
                                         const char *fallback);
@@ -35,13 +44,12 @@ static Eina_List  *efreet_dirs_get(const char *key,
 int
 efreet_base_init(void)
 {
-    if (!eina_stringshare_init()) return 0;
-    if (!eina_list_init())
+    _efreet_base_log_dom = eina_log_domain_register("Efreet_base", EFREET_DEFAULT_LOG_COLOR);
+    if (_efreet_base_log_dom < 0)
     {
-        eina_stringshare_shutdown();
-        return 0;
+	ERROR("Efreet: Could not create a log domain for efreet_base.\n");
+	return 0;
     }
-
     return 1;
 }
 
@@ -61,8 +69,7 @@ efreet_base_shutdown(void)
     IF_FREE_LIST(xdg_data_dirs, eina_stringshare_del);
     IF_FREE_LIST(xdg_config_dirs, eina_stringshare_del);
 
-    eina_list_shutdown();
-    eina_stringshare_shutdown();
+    eina_log_domain_unregister(_efreet_base_log_dom);
 }
 
 /**

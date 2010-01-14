@@ -1,14 +1,17 @@
+# get rid of that stupid cache mechanism
 rm -f config.cache
 
-AC_INIT([efreet], [0.5.0.062], [enlightenment-devel@lists.sourceforge.net])
+AC_INIT([efreet], [0.5.0.063], [enlightenment-devel@lists.sourceforge.net])
+release="ver-svn-05"
 AC_PREREQ([2.52])
 AC_CONFIG_SRCDIR([configure.ac])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
 
-AM_INIT_AUTOMAKE(1.6 dist-bzip2)
-AM_CONFIG_HEADER(config.h)
+AM_INIT_AUTOMAKE([1.6 dist-bzip2])
+AM_CONFIG_HEADER([config.h])
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 AC_ISC_POSIX
 AC_PROG_CC
@@ -27,7 +30,6 @@ VMIN=`echo $PACKAGE_VERSION | awk -F. '{printf("%s", $2);}'`
 VMIC=`echo $PACKAGE_VERSION | awk -F. '{printf("%s", $3);}'`
 SNAP=`echo $PACKAGE_VERSION | awk -F. '{printf("%s", $4);}'`
 version_info=`expr $VMAJ + $VMIN`":$VMIC:$VMIN"
-release="ver-svn-03"
 efreet_release_info="-release $release"
 efreet_mime_release_info="-release $release"
 efreet_trash_release_info="-release $release"
@@ -37,6 +39,14 @@ AC_SUBST(efreet_mime_release_info)
 AC_SUBST(efreet_trash_release_info)
 
 PKG_PROG_PKG_CONFIG
+
+# Check whether pkg-config supports Requires.private
+if $PKG_CONFIG --atleast-pkgconfig-version 0.22; then
+   pkgconfig_requires_private="Requires.private"
+else
+   pkgconfig_requires_private="Requires"
+fi
+AC_SUBST(pkgconfig_requires_private)
 
 EFL_EFREET_BUILD=""
 EFL_EFREET_MIME_BUILD=""

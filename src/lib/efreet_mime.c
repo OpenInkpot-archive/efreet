@@ -4,6 +4,23 @@
 # include <config.h>
 #endif
 
+#ifdef HAVE_ALLOCA_H
+# include <alloca.h>
+#elif defined __GNUC__
+# define alloca __builtin_alloca
+#elif defined _AIX
+# define alloca __alloca
+#elif defined _MSC_VER
+# include <malloc.h>
+# define alloca _alloca
+#else
+# include <stddef.h>
+# ifdef  __cplusplus
+extern "C"
+# endif
+void *alloca (size_t);
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -24,23 +41,6 @@
 # include <arpa/inet.h>
 #endif
 
-#ifdef HAVE_ALLOCA_H
-# include <alloca.h>
-#elif defined __GNUC__
-# define alloca __builtin_alloca
-#elif defined _AIX
-# define alloca __alloca
-#elif defined _MSC_VER
-# include <malloc.h>
-# define alloca _alloca
-#else
-# include <stddef.h>
-# ifdef  __cplusplus
-extern "C"
-# endif
-void *alloca (size_t);
-#endif
-
 #include <Ecore.h>
 #include <Ecore_File.h>
 
@@ -54,7 +54,7 @@ static Eina_Hash *wild = NULL;      /* contains *.ext and mime.types globs*/
 static Eina_Hash *monitors = NULL;  /* contains file monitors */
 static Eina_Hash *mime_icons = NULL; /* contains cache with mime->icons */
 static Eina_Inlist *mime_icons_lru = NULL;
-static unsigned int _init_count = 0;
+static unsigned int _efreet_mime_init_count = 0;
 
 /**
  * @internal
@@ -151,6 +151,14 @@ struct Efreet_Mime_Icon_Entry
     unsigned int size;
 };
 
+/* define macros and variable for using the eina logging system  */
+
+#ifdef EFREET_MODULE_LOG_DOM 
+#undef EFREET_MODULE_LOG_DOM
+#endif
+#define EFREET_MODULE_LOG_DOM _efreet_mime_log_dom
+static int _efreet_mime_log_dom = -1;
+
 
 static int efreet_mime_glob_remove(const char *glob);
 static void efreet_mime_mime_types_load(const char *file);
@@ -194,18 +202,25 @@ static void efreet_mime_icons_debug(void);
 EAPI int
 efreet_mime_init(void)
 {
-    _init_count++;
-    if (_init_count > 1)
-        return 1;
+    if (++_efreet_mime_init_count != 1)
+        return _efreet_mime_init_count;
 
     if (!ecore_init())
-        return 0;
+        return --_efreet_mime_init_count;
 
     if (!ecore_file_init())
-        return 0;
+        goto shutdown_ecore;
 
     if (!efreet_init())
-        return 0;
+        goto shutdown_ecore_file;
+
+    _efreet_mime_log_dom = eina_log_domain_register("Efreet_mime", EFREET_DEFAULT_LOG_COLOR);
+
+    if (_efreet_mime_log_dom < 0) 
+    {
+	ERROR("Efreet: Could not create a log domain for Efreet_mime.");
+	goto shutdown_efreet;
+    }
 
     efreet_mime_endianess = efreet_mime_endian_check();
 
@@ -214,25 +229,31 @@ efreet_mime_init(void)
     efreet_mime_type_cache_clear();
 
     if (!efreet_mime_init_files())
-        return 0;
+        goto unregister_log_domain;
 
-    return 1;
+    return _efreet_mime_init_count;
+
+ unregister_log_domain:
+    eina_log_domain_unregister(_efreet_mime_log_dom);
+ shutdown_efreet:
+    efreet_shutdown();
+ shutdown_ecore_file:
+    ecore_file_shutdown();
+ shutdown_ecore:
+    ecore_shutdown();
+
+    return --_efreet_mime_init_count;
 }
 
 /**
  * @return Returns no value
  * @brief Cleans up the efreet mime settings system
  */
-EAPI void
+EAPI int
 efreet_mime_shutdown(void)
 {
-    void *d;
-
-    if (_init_count == 0)
-        return;
-    _init_count--;
-    if (_init_count > 0)
-        return;
+    if (--_efreet_mime_init_count != 0)
+        return _efreet_mime_init_count;
 
     efreet_mime_icons_debug();
 
@@ -241,10 +262,12 @@ efreet_mime_shutdown(void)
     IF_FREE_HASH(monitors);
     IF_FREE_HASH(wild);
     IF_FREE_HASH(mime_icons);
-
+    eina_log_domain_unregister(_efreet_mime_log_dom);
     efreet_shutdown();
     ecore_file_shutdown();
     ecore_shutdown();
+
+    return _efreet_mime_init_count;
 }
 
 /**
@@ -335,6 +358,9 @@ efreet_mime_type_icon_get(const char *mime, const char *theme, unsigned int size
     while ((ppp = strrchr(pp, '-')))
     {
         *ppp = '\0';
+
+        snprintf(buf, sizeof(buf), "%s-x-generic", pp);
+        icons = eina_list_append(icons, strdup(buf));
 
         snprintf(buf, sizeof(buf), "%s-generic", pp);
         icons = eina_list_append(icons, strdup(buf));
@@ -487,10 +513,10 @@ efreet_mime_monitor_add(const char *file)
         return;
 
     if ((fm = ecore_file_monitor_add(file, efreet_mime_cb_update_file, NULL)))
-      {
-	 eina_hash_del(monitors, file, NULL);
-	 eina_hash_add(monitors, file, fm);
-      }
+    {
+        eina_hash_del(monitors, file, NULL);
+        eina_hash_add(monitors, file, fm);
+    }
 }
 
 /**
@@ -525,8 +551,8 @@ efreet_mime_load_globs(Eina_List *datadirs, const char *datahome)
     efreet_mime_mime_types_load("/etc/mime.types");
 
     datadir = datahome;
-        snprintf(buf, sizeof(buf), "%s/mime/globs", datadir);
-        efreet_mime_shared_mimeinfo_globs_load(buf);
+    snprintf(buf, sizeof(buf), "%s/mime/globs", datadir);
+    efreet_mime_shared_mimeinfo_globs_load(buf);
 
     EINA_LIST_FOREACH(datadirs, l, datadir)
     {
@@ -556,8 +582,8 @@ efreet_mime_load_magics(Eina_List *datadirs, const char *datahome)
     }
 
     datadir = datahome;
-        snprintf(buf, sizeof(buf), "%s/mime/magic", datadir);
-        efreet_mime_shared_mimeinfo_magic_load(buf);
+    snprintf(buf, sizeof(buf), "%s/mime/magic", datadir);
+    efreet_mime_shared_mimeinfo_magic_load(buf);
 
     EINA_LIST_FOREACH(datadirs, l, datadir)
     {
@@ -625,8 +651,8 @@ efreet_mime_init_files(void)
      * We watch the directories so we can watch for new files
      */
     datadir = datahome;
-        snprintf(buf, PATH_MAX, "%s/mime", datadir);
-        efreet_mime_monitor_add(buf);
+    snprintf(buf, PATH_MAX, "%s/mime", datadir);
+    efreet_mime_monitor_add(buf);
 
     EINA_LIST_FOREACH(datadirs, l, datadir)
     {
@@ -741,6 +767,9 @@ efreet_mime_fallback_check(const char *file)
     char buf[32];
     int i;
 
+    if (ecore_file_can_exec(file))
+      return "application/x-executable";
+    
     if (!(f = fopen(file, "r"))) return NULL;
 
     i = fread(buf, 1, sizeof(buf), f);
@@ -777,13 +806,13 @@ efreet_mime_glob_remove(const char *glob)
     Efreet_Mime_Glob *mime = NULL;
 
     if ((mime = eina_list_search_unsorted(globs, EINA_COMPARE_CB(strcmp), glob)))
-        {
+    {
         globs = eina_list_remove(globs, mime);
-            IF_RELEASE(mime->glob);
-            IF_RELEASE(mime->mime);
-            FREE(mime);
-            return 1;
-        }
+        IF_RELEASE(mime->glob);
+        IF_RELEASE(mime->mime);
+        FREE(mime);
+        return 1;
+    }
 
     return 0;
 }
@@ -1105,11 +1134,10 @@ efreet_mime_shared_mimeinfo_magic_parse(char *data, int size)
                 case '~':
                     ptr++;
                     entry->word_size = atoi(ptr);
-                    if (((entry->word_size != 0)
-                            && (entry->word_size != 1)
-                            && (entry->word_size != 2)
-                            && (entry->word_size != 4))
-                            || (entry->value_len % entry->word_size))
+                    if ((entry->word_size != 0) && ((entry->word_size != 1)
+						     && (entry->word_size != 2)
+						     && (entry->word_size != 4)
+						     || (entry->value_len % entry->word_size)))
                     {
                         /* Invalid, Destroy */
                         FREE(entry->value);
@@ -1553,11 +1581,11 @@ efreet_mime_icons_debug(void)
             now = 0;
         }
 
-        printf("mime-icon entry: '%s' last used: %s",
+        DBG("mime-icon entry: '%s' last used: %s",
                entry->mime, ctime(&entry->timestamp));
 
         EINA_INLIST_FOREACH(entry->list, n)
-            printf("\tsize: %3u theme: '%s' icon: '%s'\n",
+            DBG("\tsize: %3u theme: '%s' icon: '%s'",
                    n->theme, n->size, n->icon);
     }
 }
