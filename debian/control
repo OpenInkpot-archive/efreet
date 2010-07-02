@@ -3,15 +3,15 @@ Section: gui
 Priority: optional
 Maintainer: Alexander Kerner <lunohod@openinkpot.org>
 Uploaders: Mikhail Gusarov <dottedmag@dottedmag.net>
-Build-Depends: debhelper (>= 6), cdbs, automake, libtool, pkg-config, libeina-dev (>= 0.9.9.063-1), libecore-dev (>= 0.9.9.062-1)
+Build-Depends: debhelper (>= 6), cdbs, automake, libtool, pkg-config, libeina-dev (>= 0.9.9.49898), libecore-dev (>= 0.9.9.49898)
 Standards-Version: 3.8.2
 Homepage: http://www.enlightenment.org
 XCS-Cross-Host-Build-Depends: debhelper (>= 6), cdbs, cdbs-embedded, automake, libtool, pkg-config
-XCS-Cross-Build-Depends: libeina-dev (>= 0.9.9.063-1), libecore-dev (>= 0.9.9.063-4)
+XCS-Cross-Build-Depends: libeina-dev (>= 0.9.9.49898), libecore-dev (>= 0.9.9.49898)
 XS-Vcs-Git: http://git.openinkpot.org/efreet.git
 XS-Vcs-Browser: http://git.openinkpot.org/efreet.git
 
-Package: libefreet-svn-05
+Package: libefreet-svn-06
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Conflicts: libefreet0
@@ -32,7 +32,7 @@ Description: Library that implements freedesktop.org specs for use with E17/EFL
 Package: libefreet-dev
 Section: libdevel
 Architecture: any
-Depends: ${misc:Depends}, libefreet-svn-05 (= ${binary:Version}), libecore-dev (>= 0.9.9.063-4), libeina-dev (>= 0.9.9.063-1)
+Depends: ${misc:Depends}, libefreet-svn-06 (= ${binary:Version}), libecore-dev (>= 0.9.9.49898), libeina-dev (>= 0.9.9.49898)
 Description: Development files for libefreet and libefreet-mime
  An implementation of several specifications from freedesktop.org intended for
  use in Enlightenment DR17 (e17) and other applications using the Enlightenment
