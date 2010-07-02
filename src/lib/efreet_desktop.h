@@ -17,9 +17,21 @@ EAPI extern int EFREET_DESKTOP_TYPE_LINK;
 EAPI extern int EFREET_DESKTOP_TYPE_DIRECTORY;
 
 /**
+ * Event id for cache update. All users of efreet_desktop_get must listen to
+ * this event and refetch. The old eet cache will be closed and mem will
+ * be invalidated.
+ */
+EAPI extern int EFREET_EVENT_DESKTOP_CACHE_UPDATE;
+
+/**
  * Efreet_Desktop
  */
 typedef struct _Efreet_Desktop Efreet_Desktop;
+
+/**
+ * Efreet_Event_Cache_Update
+ */
+typedef struct _Efreet_Event_Cache_Update Efreet_Event_Cache_Update;
 
 /**
  * A callback used with efreet_desktop_command_get()
@@ -57,9 +69,8 @@ struct _Efreet_Desktop
     int type;               /**< type of desktop file */
 
     int ref;                /**< reference count - internal */
-    int cache_flush;        /**< cache flush value - internal */
 
-    double version;         /**< version of spec file conforms to */
+    char *version;          /**< version of spec file conforms to */
 
     char *orig_path;        /**< original path to .desktop file */
     long long load_time;    /**< modified time of .desktop on disk */
@@ -82,21 +93,33 @@ struct _Efreet_Desktop
     Eina_List  *categories;     /**< Categories in which item should be shown */
     Eina_List  *mime_types;     /**< The mime types supppored by this app */
 
-    unsigned char no_display:1;        /**< Don't display this application in menus */
-    unsigned char hidden:1;            /**< User delete the item */
-    unsigned char terminal:1;          /**< Does the program run in a terminal */
-    unsigned char startup_notify:1;    /**< The starup notify settings of the app */
-    unsigned char cached:1;            /**< The desktop file is cached by Efreet */
+    unsigned char no_display;        /**< Don't display this application in menus */
+    unsigned char hidden;            /**< User delete the item */
+    unsigned char terminal;          /**< Does the program run in a terminal */
+    unsigned char startup_notify;    /**< The starup notify settings of the app */
+    unsigned char cached:1;          /**< The desktop file is cached by Efreet */
+    unsigned char eet:1;             /**< The desktop file is in eet cache */
 
     Eina_Hash *x; /**< Keep track of all user extensions, keys that begin with X- */
     void *type_data; /**< Type specific data for custom types */
+};
+
+/**
+ * Efreet_Event_Cache_Update
+ * @brief event struct sent with EFREET_EVENT_CACHE_UPDATE
+ */
+struct _Efreet_Event_Cache_Update
+{
+    int dummy;
 };
 
 EAPI Efreet_Desktop   *efreet_desktop_get(const char *file);
 EAPI int               efreet_desktop_ref(Efreet_Desktop *desktop);
 EAPI Efreet_Desktop   *efreet_desktop_empty_new(const char *file);
 EAPI Efreet_Desktop   *efreet_desktop_new(const char *file);
+EAPI Efreet_Desktop   *efreet_desktop_uncached_new(const char *file);
 EAPI void              efreet_desktop_free(Efreet_Desktop *desktop);
+#define efreet_desktop_unref(desktop) efreet_desktop_free((desktop))
 
 EAPI int               efreet_desktop_save(Efreet_Desktop *desktop);
 EAPI int               efreet_desktop_save_as(Efreet_Desktop *desktop,
@@ -139,8 +162,6 @@ EAPI char             *efreet_desktop_string_list_join(Eina_List *list);
 EAPI Eina_Bool         efreet_desktop_x_field_set(Efreet_Desktop *desktop, const char *key, const char *data);
 EAPI const char *      efreet_desktop_x_field_get(Efreet_Desktop *desktop, const char *key);
 EAPI Eina_Bool         efreet_desktop_x_field_del(Efreet_Desktop *desktop, const char *key);
-
-EAPI void              efreet_desktop_cache_flush(void);
 
 /**
  * @}

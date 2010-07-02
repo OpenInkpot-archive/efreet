@@ -6,9 +6,16 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
+
+#include <Ecore.h>
+#include <Ecore_File.h>
 
 #include "Efreet.h"
 #include "efreet_private.h"
+
+static Efreet_Version _version = { VMAJ, VMIN, VMIC, VREV };
+EAPI Efreet_Version *efreet_version = &_version;
 
 #ifdef _WIN32
 # define EFREET_PATH_SEP ';'
@@ -47,8 +54,8 @@ efreet_base_init(void)
     _efreet_base_log_dom = eina_log_domain_register("Efreet_base", EFREET_DEFAULT_LOG_COLOR);
     if (_efreet_base_log_dom < 0)
     {
-	ERROR("Efreet: Could not create a log domain for efreet_base.\n");
-	return 0;
+        ERROR("Efreet: Could not create a log domain for efreet_base.\n");
+        return 0;
     }
     return 1;
 }
@@ -76,8 +83,10 @@ efreet_base_shutdown(void)
  * @internal
  * @return Returns the users home directory
  * @brief Gets the users home directory and returns it.
+ *
+ * Needs EAPI because of helper binaries
  */
-const char *
+EAPI const char *
 efreet_home_dir_get(void)
 {
     if (efreet_home_dir) return efreet_home_dir;
@@ -126,11 +135,11 @@ efreet_data_dirs_get(void)
     if (xdg_data_dirs) return xdg_data_dirs;
 
 #ifdef _WIN32
-    snprintf(buf, 4096, "%s\\Efl;" PACKAGE_DATA_DIR ";/usr/share", getenv("APPDATA"));
+    snprintf(buf, 4096, "%s\\Efl;" PACKAGE_DATA_DIR ";/usr/share;/usr/local/share", getenv("APPDATA"));
     xdg_data_dirs = efreet_dirs_get("XDG_DATA_DIRS", buf);
 #else
     xdg_data_dirs = efreet_dirs_get("XDG_DATA_DIRS",
-                            PACKAGE_DATA_DIR ":/usr/share");
+                            PACKAGE_DATA_DIR ":/usr/share:/usr/local/share");
 #endif
     return xdg_data_dirs;
 }
@@ -224,27 +233,38 @@ efreet_dirs_get(const char *key, const char *fallback)
     Eina_List *dirs = NULL;
     const char *path;
     char *tmp, *s, *p;
+    size_t len;
 
     path = getenv(key);
     if (!path || (path[0] == '\0')) path = fallback;
 
     if (!path) return dirs;
 
-    tmp = strdup(path);
+    len = strlen(path) + 1;
+    tmp = alloca(len);
+    memcpy(tmp, path, len);
     s = tmp;
     p = strchr(s, EFREET_PATH_SEP);
     while (p)
     {
         *p = '\0';
         if (!eina_list_search_unsorted(dirs, EINA_COMPARE_CB(strcmp), s))
-            dirs = eina_list_append(dirs, (void *)eina_stringshare_add(s));
+        {
+            // resolve path properly/fully to remove path//path2 to
+            // path/path2, path/./path2 to path/path2 etc.
+            char *ts = ecore_file_realpath(s);
+            if (ts)
+            {
+                dirs = eina_list_append(dirs, (void *)eina_stringshare_add(ts));
+                free(ts);
+            }
+        }
 
         s = ++p;
         p = strchr(s, EFREET_PATH_SEP);
     }
     if (!eina_list_search_unsorted(dirs, EINA_COMPARE_CB(strcmp), s))
-      dirs = eina_list_append(dirs, (void *)eina_stringshare_add(s));
-    FREE(tmp);
+        dirs = eina_list_append(dirs, (void *)eina_stringshare_add(s));
 
     return dirs;
 }

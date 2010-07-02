@@ -7,18 +7,19 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
-#include <Ecore_Str.h>
+#include <limits.h>
 
 #include "Efreet.h"
 #include "efreet_private.h"
 #include "efreet_xml.h"
 
+EAPI int efreet_cache_update = 1;
+
 static int _efreet_init_count = 0;
 static int efreet_parsed_locale = 0;
-static char *efreet_lang = NULL;
-static char *efreet_lang_country = NULL;
-static char *efreet_lang_modifier = NULL;
+static const char *efreet_lang = NULL;
+static const char *efreet_lang_country = NULL;
+static const char *efreet_lang_modifier = NULL;
 int _efreet_log_domain_global = -1;
 static void efreet_parse_locale(void);
 static int efreet_parse_locale_setting(const char *env);
@@ -35,47 +36,56 @@ efreet_init(void)
 
     if (!eina_init())
         return --_efreet_init_count;
+    if (!eet_init())
+        goto shutdown_eina;
     _efreet_log_domain_global = eina_log_domain_register("Efreet", EFREET_DEFAULT_LOG_COLOR);
     if (_efreet_log_domain_global < 0) 
     {
         printf("Efreet could create a general log domain.\n");
 
-	goto shutdown_eina;
+        goto shutdown_eet;
     }
 
     if (!efreet_base_init())
-      goto unregister_log_domain;
+        goto unregister_log_domain;
 
     if (!efreet_xml_init())
-      goto shutdown_efreet_base;
+        goto shutdown_efreet_base;
 
     if (!efreet_icon_init())
-      goto shutdown_efreet_xml;
+        goto shutdown_efreet_xml;
 
     if (!efreet_ini_init())
-      goto shutdown_efreet_icon;
+        goto shutdown_efreet_icon;
 
     if (!efreet_desktop_init())
-      goto shutdown_efreet_ini;
+        goto shutdown_efreet_ini;
 
     if (!efreet_menu_init())
-      goto shutdown_efreet_desktop;
+        goto shutdown_efreet_desktop;
+
+    if (!efreet_util_init())
+        goto shutdown_efreet_menu;
 
     return _efreet_init_count;
 
- shutdown_efreet_desktop:
+shutdown_efreet_menu:
+    efreet_menu_shutdown();
+shutdown_efreet_desktop:
     efreet_desktop_shutdown();
- shutdown_efreet_ini:
+shutdown_efreet_ini:
     efreet_ini_shutdown();
- shutdown_efreet_icon:
+shutdown_efreet_icon:
     efreet_icon_shutdown();
- shutdown_efreet_xml:
+shutdown_efreet_xml:
     efreet_xml_shutdown();
- shutdown_efreet_base:
+shutdown_efreet_base:
     efreet_base_shutdown();
- unregister_log_domain:
+unregister_log_domain:
     eina_log_domain_unregister(_efreet_log_domain_global);
- shutdown_eina:
+shutdown_eet:
+    eet_shutdown();
+shutdown_eina:
     eina_shutdown();
 
     return --_efreet_init_count;
@@ -91,8 +101,9 @@ EAPI int
 efreet_shutdown(void)
 {
     if (--_efreet_init_count != 0)
-      return _efreet_init_count;
+        return _efreet_init_count;
 
+    efreet_util_shutdown();
     efreet_menu_shutdown();
     efreet_desktop_shutdown();
     efreet_ini_shutdown();
@@ -100,12 +111,14 @@ efreet_shutdown(void)
     efreet_xml_shutdown();
     efreet_base_shutdown();
     eina_log_domain_unregister(_efreet_log_domain_global);
-    eina_shutdown();
 
-    IF_FREE(efreet_lang);
-    IF_FREE(efreet_lang_country);
-    IF_FREE(efreet_lang_modifier);
+    IF_RELEASE(efreet_lang);
+    IF_RELEASE(efreet_lang_country);
+    IF_RELEASE(efreet_lang_modifier);
     efreet_parsed_locale = 0;  /* reset this in case they init efreet again */
+
+    eet_shutdown();
+    eina_shutdown();
 
     return _efreet_init_count;
 }
@@ -186,17 +199,20 @@ efreet_parse_locale_setting(const char *env)
     int found = 0;
     char *setting;
     char *p;
+    size_t len;
 
-    setting = getenv(env);
-    if (!setting) return 0;
-    setting = strdup(setting);
+    p = getenv(env);
+    if (!p) return 0;
+    len = strlen(p) + 1;
+    setting = alloca(len);
+    memcpy(setting, p, len);
 
     /* pull the modifier off the end */
     p = strrchr(setting, '@');
     if (p)
     {
         *p = '\0';
-        efreet_lang_modifier = strdup(p + 1);
+        efreet_lang_modifier = eina_stringshare_add(p + 1);
         found = 1;
     }
 
@@ -209,17 +225,15 @@ efreet_parse_locale_setting(const char *env)
     if (p)
     {
         *p = '\0';
-        efreet_lang_country = strdup(p + 1);
+        efreet_lang_country = eina_stringshare_add(p + 1);
         found = 1;
     }
 
-    if (setting && (*setting != '\0'))
+    if (*setting != '\0')
     {
-        efreet_lang = strdup(setting);
+        efreet_lang = eina_stringshare_add(setting);
         found = 1;
     }
-
-    FREE(setting);
 
     return found;
 }
@@ -240,7 +254,7 @@ efreet_array_cat(char *buffer, size_t size, const char *strs[])
     size_t n;
     for (i = 0, n = 0; n < size && strs[i]; i++)
     {
-        n += ecore_strlcpy(buffer + n, strs[i], size - n);
+        n += eina_strlcpy(buffer + n, strs[i], size - n);
     }
     return n;
 }

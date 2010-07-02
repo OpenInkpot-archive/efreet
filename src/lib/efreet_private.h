@@ -2,6 +2,27 @@
 #ifndef EFREET_PRIVATE_H
 #define EFREET_PRIVATE_H
 
+#include <Eet.h>
+
+#undef alloca
+#ifdef HAVE_ALLOCA_H
+# include <alloca.h>
+#elif defined __GNUC__
+# define alloca __builtin_alloca
+#elif defined _AIX
+# define alloca __alloca
+#elif defined _MSC_VER
+# include <malloc.h>
+# define alloca _alloca
+#else
+# include <stddef.h>
+# ifdef  __cplusplus
+extern "C"
+# endif
+void *alloca (size_t);
+#endif
+
+
 /**
  * @file efreet_private.h
  * @brief Contains methods and defines that are private to the Efreet
@@ -63,14 +84,6 @@
     (x) = NULL; \
 } while (0)
 
-#ifndef PATH_MAX
-/**
- * @def PATH_MAX
- * Convenience define to set the maximim path length
- */
-#define PATH_MAX 4096
-#endif
-
 /**
  * @def _efree_log_domain_global
  * global log domain for efreet (see eina_log module)
@@ -122,62 +135,6 @@ extern int _efreet_log_dom_global;
 #undef WRN
 #endif
 #define WRN(...) EINA_LOG_DOM_WARN(EFREET_MODULE_LOG_DOM, __VA_ARGS__)
-/**
- * @internal
- * The different types of commands in an Exec entry
- */
-typedef enum Efreet_Desktop_Command_Flag
-{
-    EFREET_DESKTOP_EXEC_FLAG_FULLPATH = 0x0001,
-    EFREET_DESKTOP_EXEC_FLAG_URI      = 0x0002,
-    EFREET_DESKTOP_EXEC_FLAG_DIR      = 0x0004,
-    EFREET_DESKTOP_EXEC_FLAG_FILE     = 0x0008
-} Efreet_Desktop_Command_Flag;
-
-/**
- * @internal
- * Efreet_Desktop_Command
- */
-typedef struct Efreet_Desktop_Command Efreet_Desktop_Command;
-
-/**
- * @internal
- * Holds information on a desktop Exec command entry
- */
-struct Efreet_Desktop_Command
-{
-  Efreet_Desktop *desktop;
-  int num_pending;
-
-  Efreet_Desktop_Command_Flag flags;
-
-  Efreet_Desktop_Command_Cb cb_command;
-  Efreet_Desktop_Progress_Cb cb_progress;
-  void *data;
-
-  Eina_List *files; /**< list of Efreet_Desktop_Command_File */
-};
-
-/**
- * @internal
- * Efreet_Desktop_Command_File
- */
-typedef struct Efreet_Desktop_Command_File Efreet_Desktop_Command_File;
-
-/**
- * @internal
- * Stores information on a file passed to the desktop Exec command
- */
-struct Efreet_Desktop_Command_File
-{
-  Efreet_Desktop_Command *command;
-  char *dir;
-  char *file;
-  char *fullpath;
-  char *uri;
-
-  int pending;
-};
 
 int efreet_base_init(void);
 void efreet_base_shutdown(void);
@@ -187,9 +144,9 @@ void efreet_icon_shutdown(void);
 
 int efreet_menu_init(void);
 void efreet_menu_shutdown(void);
-Eina_List *efreet_default_dirs_get(const char *user_dir,
-                                    Eina_List *system_dirs,
-                                    const char *suffix);
+EAPI Eina_List *efreet_default_dirs_get(const char *user_dir,
+                                        Eina_List *system_dirs,
+                                        const char *suffix);
 
 int efreet_ini_init(void);
 void efreet_ini_shutdown(void);
@@ -197,21 +154,30 @@ void efreet_ini_shutdown(void);
 int efreet_desktop_init(void);
 void efreet_desktop_shutdown(void);
 
-const char *efreet_home_dir_get(void);
+int efreet_util_init(void);
+int efreet_util_shutdown(void);
 
-EAPI const char *efreet_lang_get(void);
-EAPI const char *efreet_lang_country_get(void);
-EAPI const char *efreet_lang_modifier_get(void);
+EAPI const char *efreet_home_dir_get(void);
+
+const char *efreet_lang_get(void);
+const char *efreet_lang_country_get(void);
+const char *efreet_lang_modifier_get(void);
 
 size_t efreet_array_cat(char *buffer, size_t size, const char *strs[]);
 
 const char *efreet_desktop_environment_get(void);
 
+EAPI Eet_Data_Descriptor *efreet_desktop_edd_init(void);
+EAPI void efreet_desktop_edd_shutdown(Eet_Data_Descriptor *edd);
+
+void efreet_util_desktop_cache_reload(void);
+EAPI const char *efreet_desktop_util_cache_file(void);
+EAPI const char *efreet_desktop_cache_file(void);
+EAPI const char *efreet_desktop_cache_dirs(void);
+
 #define NON_EXISTING (void *)-1
 
-void efreet_cache_clear(void);
-const char *efreet_icon_hash_get(const char *theme_name, const char *icon, int size);
-void efreet_icon_hash_put(const char *theme_name, const char *icon, int size, const char *file);
+EAPI extern int efreet_cache_update;
 
 /**
  * @}
